@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎬 MySubtitler</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="text-white" data-max-size-mb="{{ max_size_mb }}">
+  <div class="card-main">
+    <h2 class="text-center mb-1">🎬 MySubtitler</h2>
+    <p class="text-center text-white-50 mb-4">Upload a video, choose subtitle language/translation, and customize the subtitle style</p>
+
+    <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Select a video file">
+      <div class="icon">📁</div>
+      <div>Drag &amp; drop your video here, or <u>click to browse</u></div>
+      <div class="filename" id="fileName" hidden></div>
+      <input type="file" id="fileInput" accept=".mp4,.mov,.mkv,.avi,.webm" hidden>
+    </div>
+
+    <div class="settings-panel mt-4">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label" for="sourceLanguage">Spoken language</label>
+          <select class="form-select form-control-dark" id="sourceLanguage" name="source_language" data-upload-field>
+            {% for code, label in languages %}
+              <option value="{{ code }}" {% if code == 'auto' %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <div class="field-hint">Choose the audio language for better transcription accuracy.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="translateTo">Translate subtitles to</label>
+          <select class="form-select form-control-dark" id="translateTo" name="translate_to" data-upload-field>
+            <option value="" selected>No translation</option>
+            {% for code, label in languages if code != 'auto' %}
+              <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <div class="field-hint">Optional. The downloadable SRT/ASS files will use the translated text.</div>
+        </div>
+      </div>
+
+      <details class="advanced-settings mt-3">
+        <summary>Advanced subtitle style settings</summary>
+        <div class="row g-3 mt-2">
+          <div class="col-md-6">
+            <label class="form-label" for="fontName">Font family</label>
+            <input class="form-control form-control-dark" id="fontName" name="font_name" type="text" value="{{ default_style.font_name }}" data-upload-field>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="fontSize">Font size</label>
+            <input class="form-control form-control-dark" id="fontSize" name="font_size" type="number" min="12" max="72" value="{{ default_style.font_size }}" data-upload-field>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="position">Position</label>
+            <select class="form-select form-control-dark" id="position" name="position" data-upload-field>
+              {% for value, label in positions %}
+                <option value="{{ value }}" {% if value == default_style.position %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label" for="textColor">Text color</label>
+            <input class="form-control form-control-color w-100" id="textColor" name="text_color" type="color" value="{{ default_style.text_color }}" data-upload-field>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="outlineColor">Outline color</label>
+            <input class="form-control form-control-color w-100" id="outlineColor" name="outline_color" type="color" value="{{ default_style.outline_color }}" data-upload-field>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="backgroundColor">Background color</label>
+            <input class="form-control form-control-color w-100" id="backgroundColor" name="background_color" type="color" value="{{ default_style.background_color }}" data-upload-field>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label" for="outlineWidth">Outline width</label>
+            <input class="form-control form-control-dark" id="outlineWidth" name="outline_width" type="number" min="0" max="8" value="{{ default_style.outline_width }}" data-upload-field>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="shadow">Shadow</label>
+            <input class="form-control form-control-dark" id="shadow" name="shadow" type="number" min="0" max="8" value="{{ default_style.shadow }}" data-upload-field>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="marginV">Vertical margin</label>
+            <input class="form-control form-control-dark" id="marginV" name="margin_v" type="number" min="0" max="120" value="{{ default_style.margin_v }}" data-upload-field>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="backgroundOpacity">Background opacity <span id="backgroundOpacityValue">{{ default_style.background_opacity }}%</span></label>
+            <input class="form-range" id="backgroundOpacity" name="background_opacity" type="range" min="0" max="100" value="{{ default_style.background_opacity }}" data-upload-field>
+          </div>
+
+          <div class="col-12">
+            <div class="option-grid">
+              <label class="form-check option-check">
+                <input class="form-check-input" id="bold" name="bold" type="checkbox" data-upload-field>
+                <span class="form-check-label">Bold</span>
+              </label>
+              <label class="form-check option-check">
+                <input class="form-check-input" id="italic" name="italic" type="checkbox" data-upload-field>
+                <span class="form-check-label">Italic</span>
+              </label>
+              <label class="form-check option-check">
+                <input class="form-check-input" id="underline" name="underline" type="checkbox" data-upload-field>
+                <span class="form-check-label">Underline</span>
+              </label>
+              <label class="form-check option-check">
+                <input class="form-check-input" id="strikeout" name="strikeout" type="checkbox" data-upload-field>
+                <span class="form-check-label">Strikeout</span>
+              </label>
+              <label class="form-check option-check">
+                <input class="form-check-input" id="useBackgroundBox" name="use_background_box" type="checkbox" data-upload-field>
+                <span class="form-check-label">Use background box</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-note mt-3">
+          Styled downloads are also provided as <strong>.ass</strong> files. SRT stays plain text for maximum compatibility.
+        </div>
+      </details>
+    </div>
+
+    <div class="text-center mt-3">
+      <button class="btn btn-upload" id="uploadBtn" type="button" disabled>
+        <span id="uploadText">Generate Subtitles</span>
+        <span id="uploadSpinner" class="spinner-border spinner-border-sm ms-2" hidden></span>
+      </button>
+    </div>
+
+    <div id="messages" aria-live="polite"></div>
+
+    <div id="progressSection" class="mt-3" hidden>
+      <div class="progress">
+        <div class="progress-bar" id="bar" style="width: 0%">0%</div>
+      </div>
+      <div class="status-text text-center" id="statusText">Starting...</div>
+    </div>
+
+    <div id="resultSection" class="text-center mt-4" hidden>
+      <p class="mb-2 accent-text">✅ Done! Download your files:</p>
+      <a id="srtLink" class="result-btn btn-srt" download hidden>📄 Download SRT</a>
+      <a id="assLink" class="result-btn btn-ass" download hidden>🎨 Download ASS</a>
+      <a id="videoLink" class="result-btn btn-vid" download hidden>🎥 Download Video</a>
+    </div>
+
+    <p class="text-center text-white-50 mt-4 footer-note">
+      Supports MP4, MOV, MKV, AVI, WEBM • Max {{ max_size_mb }}MB • Files auto-delete after 1 hour
+    </p>
+  </div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
