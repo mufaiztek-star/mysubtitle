@@ -98,6 +98,39 @@ function updateBar(percent, text) {
   }
 }
 
+function buildResponseErrorMessage(response, fallbackText) {
+  const statusLabel = response.status ? `Server error (${response.status})` : 'Server error';
+  const trimmed = (fallbackText || '').trim();
+
+  if (!trimmed) {
+    return response.ok ? 'Server returned an empty response.' : `${statusLabel}. Please try again.`;
+  }
+
+  const compact = trimmed.replace(/\s+/g, ' ');
+  const withoutHtml = compact.replace(/<[^>]+>/g, '').trim();
+  const message = withoutHtml || compact;
+
+  if (!response.ok) {
+    return `${statusLabel}: ${message.slice(0, 180)}`;
+  }
+
+  return message.slice(0, 180);
+}
+
+async function parseJsonResponse(response) {
+  const rawText = await response.text();
+
+  if (!rawText) {
+    throw new Error(buildResponseErrorMessage(response, ''));
+  }
+
+  try {
+    return JSON.parse(rawText);
+  } catch (_error) {
+    throw new Error(buildResponseErrorMessage(response, rawText));
+  }
+}
+
 async function upload() {
   if (!selectedFile) {
     return;
@@ -120,10 +153,14 @@ async function upload() {
 
   try {
     const response = await fetch('/', { method: 'POST', body: formData });
-    const data = await response.json();
+    const data = await parseJsonResponse(response);
 
     if (!response.ok || data.error) {
       throw new Error(data.error || 'Upload failed.');
+    }
+
+    if (!data.task_id) {
+      throw new Error('Upload started, but the server did not return a task ID.');
     }
 
     updateBar(5, 'Processing started...');
@@ -158,7 +195,11 @@ function pollStatus(taskId) {
   statusPollTimer = setInterval(async () => {
     try {
       const response = await fetch(`/status/${encodeURIComponent(taskId)}`);
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Unable to fetch task status.');
+      }
 
       if (data.status === 'processing') {
         const progress = data.progress || 0;

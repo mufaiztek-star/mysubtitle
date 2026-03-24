@@ -15,7 +15,7 @@ from urllib.request import urlopen
 
 from flask_cors import CORS
 from flask import Flask, jsonify, render_template, request, send_from_directory
-from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
 
@@ -817,9 +817,36 @@ def process_video(task_id, file_id, stored_filename, original_filename, options)
 
 
 # ================= ROUTES =================
+def should_return_json_error():
+    return (
+        request.method != "GET"
+        or request.path.startswith("/status/")
+        or request.path.startswith("/download/")
+    )
+
+
 @app.errorhandler(RequestEntityTooLarge)
 def handle_file_too_large(_error):
     return jsonify({"error": f"File too large. Maximum allowed size is {MAX_FILE_SIZE_MB} MB."}), 413
+
+
+@app.errorhandler(HTTPException)
+def handle_http_exception(error):
+    if not should_return_json_error():
+        return error.description, error.code
+
+    description = error.description if isinstance(error.description, str) else error.name
+    return jsonify({"error": description}), error.code
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_exception(error):
+    logger.exception("Unhandled exception during request %s %s", request.method, request.path)
+
+    if not should_return_json_error():
+        return "Internal Server Error", 500
+
+    return jsonify({"error": "Internal server error. Please try again."}), 500
 
 
 @app.route("/", methods=["GET", "POST"])
